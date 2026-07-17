@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models.user_balance import UserBalance
@@ -52,12 +52,26 @@ class BalanceRepository(BaseRepository[UserBalance]):
 
         Uses an UPDATE statement for atomicity rather than
         read-modify-write, avoiding race conditions.
+        Clamps to zero to prevent negative balances (safety net).
+
+        Falls back to create-if-not-exists when no row exists.
         """
         import uuid
-        from datetime import datetime, timezone
 
-        balance = self.get_by_user(user_id)
-        if balance is None:
+        new_available = UserBalance.available_balance + available_delta
+        new_pending = UserBalance.pending_balance + pending_delta
+
+        stmt = (
+            update(UserBalance)
+            .where(UserBalance.user_id == user_id)
+            .values(
+                available_balance=case((new_available < 0, 0.0), else_=new_available),
+                pending_balance=case((new_pending < 0, 0.0), else_=new_pending),
+            )
+        )
+        result = self.db.execute(stmt)
+
+        if result.rowcount == 0:
             balance = UserBalance(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
@@ -65,9 +79,8 @@ class BalanceRepository(BaseRepository[UserBalance]):
                 pending_balance=max(0.0, pending_delta),
             )
             self.db.add(balance)
-        else:
-            balance.available_balance = max(0.0, balance.available_balance + available_delta)
-            balance.pending_balance = max(0.0, balance.pending_balance + pending_delta)
+            self.db.flush()
+            return balance
 
         self.db.flush()
-        return balance
+        return self.get_by_user(user_id)

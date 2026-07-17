@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # Payment gateway
     payment_gateway: str = "mock"
 
+    # Security
+    admin_secret_key: str = "admin-secret-key"
+
+    # Balance verification threshold — amounts at or above this trigger
+    # a ledger double-check to catch cached balance drift
+    balance_check_threshold: float = 10000.0
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

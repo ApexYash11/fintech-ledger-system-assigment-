@@ -66,10 +66,34 @@ class BaseRepository(Generic[ModelType]):
     def update(self, entity: ModelType, updates: dict[str, Any]) -> ModelType:
         """Update entity fields from a dictionary.
 
-        Respects optimistic locking if the model has a 'version' column.
+        Enforces optimistic locking: if the model has a 'version' column,
+        the version in the database must match the entity's current version.
+        Increments version on success.
         """
+        if hasattr(entity, "version") and entity.version is not None:
+            current_version = entity.version
+            stmt = (
+                update(self.model_class)
+                .where(
+                    self.model_class.id == entity.id,  # type: ignore[attr-defined]
+                    self.model_class.version == current_version,
+                )
+                .values(**updates, version=current_version + 1)
+            )
+            result = self.db.execute(stmt)
+            if result.rowcount == 0:
+                raise OptimisticLockError(
+                    entity_type=self.model_class.__name__,
+                    entity_id=str(entity.id),
+                    expected_version=current_version,
+                )
+            self.db.flush()
+            return self.get(entity.id)
+
         for key, value in updates.items():
             setattr(entity, key, value)
+        if hasattr(entity, "version"):
+            entity.version += 1
         self.db.flush()
         return entity
 
@@ -88,3 +112,16 @@ class BaseRepository(Generic[ModelType]):
         """Total count of entities."""
         stmt = select(self.model_class)
         return self.db.execute(stmt).scalar() or 0
+
+
+class OptimisticLockError(Exception):
+    """Raised when an optimistic lock version mismatch is detected."""
+
+    def __init__(self, entity_type: str, entity_id: str, expected_version: int):
+        self.entity_type = entity_type
+        self.entity_id = entity_id
+        self.expected_version = expected_version
+        super().__init__(
+            f"{entity_type} {entity_id}: version mismatch. "
+            f"Expected version {expected_version} but database has changed."
+        )

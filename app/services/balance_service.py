@@ -79,6 +79,7 @@ class BalanceService:
         """
         from app.db.repositories.balance_repo import BalanceRepository
         from app.db.repositories.ledger_repo import LedgerRepository
+        from app.config import settings
 
         balance_repo = BalanceRepository(uow.db)
         ledger_repo = LedgerRepository(uow.db)
@@ -86,7 +87,7 @@ class BalanceService:
         balance = balance_repo.get_or_create(user_id)
         if balance.available_balance >= amount:
             # For large withdrawals, verify against the ledger
-            if amount >= 10000:
+            if amount >= settings.balance_check_threshold:
                 ledger_balance = ledger_repo.get_user_balance(user_id)
                 if ledger_balance < amount:
                     # Cache drift detected — trigger recalculation

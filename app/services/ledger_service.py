@@ -7,6 +7,12 @@ Design decision: Why a separate service instead of direct repository calls?
 1. Consistent entry creation: All entries follow the same pattern
 2. Enforces immutability: No update/delete operations exposed
 3. Centralized audit: Every entry creation can trigger audit logging
+
+Note: Currently services bypass this class and call uow.ledger.create_entry()
+and uow.balances.update_balance() directly for fine-grained control over
+balance deltas (available vs pending) and transaction ordering.
+This class is kept as a public convenience API for future use cases
+such as admin adjustment tools, reconciliation corrections, or bulk imports.
 """
 
 from typing import Any

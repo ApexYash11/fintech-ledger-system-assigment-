@@ -44,6 +44,8 @@ All configuration via `.env` file or environment variables:
 | `MIN_WITHDRAWAL_AMOUNT` | `100.00` | Minimum withdrawal amount |
 | `WITHDRAWAL_COOLDOWN_HOURS` | `24` | Cooldown between withdrawals |
 | `BATCH_SIZE` | `100` | Batch size for background jobs |
+| `ADMIN_SECRET_KEY` | `admin-secret-key` | Secret key for admin authentication |
+| `BALANCE_CHECK_THRESHOLD` | `10000.0` | Large withdrawal threshold for ledger double-check |
 
 ## API Reference
 
@@ -150,3 +152,52 @@ See [docs/architecture.md](docs/architecture.md) for detailed system design, ent
 ## Edge Cases
 
 See [docs/edge_cases.md](docs/edge_cases.md) for idempotency, concurrent modification, compensating transactions, and error recovery strategies.
+
+## Production Evolution
+
+This system is designed for a single-node startup deployment. Here's how it would evolve:
+
+### Phase 1: Monolith (Now)
+- Single FastAPI process, SQLite, APScheduler
+- Everything in-process — simple to operate, one thing to deploy
+- Works for thousands of users, hundreds of thousands of sales
+
+### Phase 2: Database Upgrade
+- Migrate SQLite → PostgreSQL (once concurrent writes become a bottleneck)
+- Connection pooling via PgBouncer
+- Materialized views for reporting queries
+
+### Phase 3: Service Extraction
+- Extract payment gateway processing into a separate worker process
+- Background jobs become standalone consumers on a Redis queue (Celery/Redis Queue)
+- Health of payment gateway calls no longer affects API response times
+
+### Phase 4: Horizontal Scaling
+- Stateless API layer behind a load balancer
+- Shared PostgreSQL and Redis
+- Idempotency keys become critical (already implemented)
+- Optimistic locking prevents double-payment races (already implemented)
+
+### Phase 5: Full Event-Driven
+- Replace APScheduler with Kafka-backed outbox pattern
+- Domain events (SaleApproved, PayoutCompleted) published to Kafka topics
+- Separate services subscribe independently
+- Replaces the current polling-based background jobs with event-driven processing
+
+### Non-Goals (for now)
+- Distributed transactions (2PC) — compensating transactions are sufficient
+- CQRS/Event Sourcing — the immutable ledger already provides audit; full ES adds complexity
+- Microservices — premature decomposition before team scaling warrants it
+- Multi-region — consistency requirements make active-active very expensive
+
+## Architecture Decision Records
+
+See [docs/adr](docs/adr/) for documented tradeoffs. Key decisions:
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 1 | Immutable ledger + cached balances | Audit trail without Event Sourcing complexity |
+| 2 | Unit of Work pattern | Atomic multi-entity transactions without 2PC |
+| 3 | State machines at service layer | Explicit validation without framework dependency |
+| 4 | Background polling over event-driven | Simpler ops, no Kafka dependency at current scale |
+| 5 | Header-based auth over JWT | Assignment constraint; swap for OAuth2 in production |

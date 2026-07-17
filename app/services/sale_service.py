@@ -142,12 +142,12 @@ class SaleService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[dict]:
-        """List sales for a user, optionally filtered by status."""
-        if status:
-            sale_status = SaleStatus(status)
-            sales = uow.sales.get_by_user_and_status(user_id, sale_status, skip, limit)
-        else:
-            sales = uow.sales.get_by_user_and_status(user_id, SaleStatus.PENDING, skip, limit)
+        """List sales for a user, optionally filtered by status.
+
+        When status is None, returns sales of all statuses.
+        """
+        sale_status = SaleStatus(status) if status else None
+        sales = uow.sales.get_by_user_and_status(user_id, sale_status, skip, limit)
 
         return [
             {

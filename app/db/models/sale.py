@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Enum as SAEnum, Text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, String, Enum as SAEnum, Text
 from sqlalchemy.orm import relationship
 
 from app.core.enums import SaleStatus, Currency
@@ -56,20 +56,6 @@ class Sale(Base, TimestampMixin, VersionMixin):
     reconciler = relationship("User", foreign_keys=[reconciled_by])
 
     __table_args__ = (
-        # Composite index for querying user's sales by status
-        __table_args__.__class__(
-            Index("ix_sales_user_status", "user_id", "status"),
-            Index("ix_sales_status_created", "status", "created_at"),
-        )
-        if False
-        else ()
+        Index("ix_sales_user_status", "user_id", "status"),
+        Index("ix_sales_status_created", "status", "created_at"),
     )
-
-
-# Import Index at module level for SQLAlchemy
-from sqlalchemy import Index
-
-Sale.__table_args__ = (
-    Index("ix_sales_user_status", "user_id", "status"),
-    Index("ix_sales_status_created", "status", "created_at"),
-)

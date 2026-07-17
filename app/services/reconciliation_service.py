@@ -235,7 +235,7 @@ class ReconciliationService:
         from app.db.repositories.sale_repo import SaleRepository
 
         repo = SaleRepository(uow.db)
-        sales = repo.get_by_user_and_status(None, SaleStatus.PENDING, skip, limit)
+        sales = repo.get_by_status(SaleStatus.PENDING, skip, limit)
 
         return [
             {

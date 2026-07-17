@@ -27,14 +27,21 @@ class PayoutRepository(BaseRepository[Payout]):
         stmt = select(Payout).where(Payout.idempotency_key == key)
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def get_pending_payouts_batch(self, batch_size: int = 100) -> list[Payout]:
-        """Get batch of pending payouts for processing."""
-        stmt = (
-            select(Payout)
-            .where(Payout.status == PayoutStatus.PENDING)
-            .order_by(Payout.created_at)
-            .limit(batch_size)
-        )
+    def get_pending_payouts_batch(
+        self,
+        batch_size: int = 100,
+        payout_type: PayoutType | None = None,
+    ) -> list[Payout]:
+        """Get batch of pending payouts for processing.
+
+        Args:
+            batch_size: Max number of payouts to return.
+            payout_type: Optional filter by payout type (e.g. only FINAL_SETTLEMENT).
+        """
+        stmt = select(Payout).where(Payout.status == PayoutStatus.PENDING)
+        if payout_type is not None:
+            stmt = stmt.where(Payout.type == payout_type)
+        stmt = stmt.order_by(Payout.created_at).limit(batch_size)
         result = self.db.execute(stmt)
         return list(result.scalars().all())
 

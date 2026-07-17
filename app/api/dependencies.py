@@ -91,7 +91,9 @@ def get_admin_user(
         raise HTTPException(status_code=401, detail="User not found")
 
     # In production, check admin role from JWT or database
-    if admin_key != "admin-secret-key":
+    from app.config import settings
+
+    if admin_key != settings.admin_secret_key:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     return user

@@ -33,6 +33,8 @@ from app.db.models.payout import Payout
 from app.db.models.withdrawal import Withdrawal
 from app.db.models.ledger import LedgerEntry
 from app.db.models.user_balance import UserBalance
+from app.db.models.idempotency import IdempotencyKey
+from app.db.models.audit_log import AuditLog
 from app.infra.payment.mock import MockPaymentGateway
 
 # Use in-memory SQLite for tests

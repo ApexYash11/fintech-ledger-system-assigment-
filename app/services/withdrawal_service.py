@@ -84,7 +84,6 @@ class WithdrawalService:
             )
 
         # Idempotency check — must happen before cooldown check
-        idem_key = idempotency_key or str(uuid.uuid4())
         if idempotency_key:
             existing = uow.withdrawals.get_by_idempotency_key(idempotency_key)
             if existing:
@@ -110,12 +109,6 @@ class WithdrawalService:
             raise InsufficientBalanceError(str(user_id), balance.available_balance, amount)
 
         import uuid
-
-        # Check for idempotency — return existing withdrawal if same key used
-        if idempotency_key:
-            existing = uow.withdrawals.get_by_idempotency_key(idempotency_key)
-            if existing:
-                return self._format_withdrawal(existing)
 
         withdrawal_id = str(uuid.uuid4())
 

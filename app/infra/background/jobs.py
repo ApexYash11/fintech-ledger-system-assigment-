@@ -28,13 +28,15 @@ def process_advance_payouts(db: Session) -> dict:
     Idempotency: Each sale is checked for existing advance payout
     before processing. Duplicate job runs are safe.
 
-    Batching: Processes up to settings.batch_size sales per run.
+    Batching: Processes sales in pages of settings.batch_size using
+    offset-based pagination. Loops until all pending sales are processed.
     """
     from app.db.repositories.sale_repo import SaleRepository
     from app.db.repositories.payout_repo import PayoutRepository
     from app.db.unit_of_work import UnitOfWork
     from app.services.payout_service import PayoutService
     from app.infra.payment.mock import MockPaymentGateway
+    from app.core.enums import PayoutType
 
     payout_service = PayoutService()
     gateway = MockPaymentGateway()
@@ -44,28 +46,40 @@ def process_advance_payouts(db: Session) -> dict:
 
     processed = 0
     errors = 0
+    offset = 0
 
-    sales = sale_repo.get_pending_sales_batch(batch_size=settings.batch_size)
+    while True:
+        sales = sale_repo.get_pending_sales_batch(
+            batch_size=settings.batch_size,
+            offset=offset,
+        )
+        if not sales:
+            break
 
-    for sale in sales:
-        try:
-            uow = UnitOfWork(db)
-            with uow:
-                payout_service.create_advance_payout(uow, str(sale.id))
-            uow.commit()
-            processed += 1
-        except Exception as e:
-            uow.rollback()
-            errors += 1
-            import logging
+        for sale in sales:
+            try:
+                uow = UnitOfWork(db)
+                with uow:
+                    payout_service.create_advance_payout(uow, str(sale.id))
+                uow.commit()
+                processed += 1
+            except Exception as e:
+                uow.rollback()
+                errors += 1
+                import logging
 
-            logging.error(f"Failed to create advance payout for sale {sale.id}: {e}")
+                logging.error(f"Failed to create advance payout for sale {sale.id}: {e}")
+
+        offset += len(sales)
 
     # Process created payouts through gateway
     if processed > 0:
         try:
             payout_repo = PayoutRepository(db)
-            pending_payouts = payout_repo.get_pending_payouts_batch(settings.batch_size)
+            pending_payouts = payout_repo.get_pending_payouts_batch(
+                settings.batch_size,
+                payout_type=PayoutType.ADVANCE,
+            )
             for payout in pending_payouts:
                 try:
                     result = gateway.send_payout(
@@ -196,12 +210,16 @@ def process_settlements(db: Session) -> dict:
     Called periodically to ensure settlement payouts (created during
     sale approval) are sent to the payment gateway.
 
+    Only processes FINAL_SETTLEMENT payouts (excludes ADVANCE payouts
+    which are handled by process_advance_payouts).
+
     Batching: Processes up to settings.batch_size payouts per run.
     """
     from app.db.repositories.payout_repo import PayoutRepository
     from app.db.unit_of_work import UnitOfWork
     from app.services.payout_service import PayoutService
     from app.infra.payment.mock import MockPaymentGateway
+    from app.core.enums import PayoutType
 
     payout_service = PayoutService()
     gateway = MockPaymentGateway()
@@ -211,7 +229,10 @@ def process_settlements(db: Session) -> dict:
     succeeded = 0
     failed_count = 0
 
-    payouts = payout_repo.get_pending_payouts_batch(batch_size=settings.batch_size)
+    payouts = payout_repo.get_pending_payouts_batch(
+        batch_size=settings.batch_size,
+        payout_type=PayoutType.FINAL_SETTLEMENT,
+    )
 
     for payout in payouts:
         try:

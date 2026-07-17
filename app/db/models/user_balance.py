@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Enum as SAEnum
+from sqlalchemy import Column, DateTime, ForeignKey, Numeric, String, Enum as SAEnum
 from sqlalchemy.orm import relationship
 
 from app.core.enums import Currency
@@ -33,8 +33,8 @@ class UserBalance(Base, TimestampMixin, VersionMixin):
     user_id = Column(
         String(36), ForeignKey("users.id", ondelete="RESTRICT"), unique=True, nullable=False
     )
-    available_balance = Column(Float, default=0.0, nullable=False)
-    pending_balance = Column(Float, default=0.0, nullable=False)
+    available_balance = Column(Numeric(12, 2), default=0.0, nullable=False)
+    pending_balance = Column(Numeric(12, 2), default=0.0, nullable=False)
     currency = Column(String(3), default=Currency.INR.value, nullable=False)
     last_calculated_at = Column(DateTime(timezone=True), nullable=True)
 

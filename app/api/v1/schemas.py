@@ -1,10 +1,10 @@
 """Pydantic schemas for API request/response validation.
 
-All money-related fields use float for simplicity.
-In production, use a Decimal type to avoid floating-point issues.
+Money fields use Decimal to avoid floating-point precision issues.
 """
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -65,10 +65,9 @@ class BrandResponse(BaseModel):
 
 
 class SaleCreate(BaseModel):
-    user_id: str
     brand_id: str
     external_id: str = Field(..., max_length=255)
-    earnings: float = Field(..., gt=0)
+    earnings: Decimal = Field(..., gt=Decimal("0"))
     currency: str = "INR"
 
 
@@ -77,7 +76,7 @@ class SaleResponse(BaseModel):
     user_id: str
     brand_id: str
     external_id: str
-    earnings: float
+    earnings: Decimal
     status: str
     currency: str
     created_at: str | None = None
@@ -98,25 +97,25 @@ class ReconciliationResponse(BaseModel):
     sale_id: str
     status: str
     decision: str
-    remaining_payout: float | None = None
+    remaining_payout: Decimal | None = None
     final_payout_id: str | None = None
     advance_recovered: bool = False
-    advance_amount: float | None = None
-    adjustment: float | None = None
+    advance_amount: Decimal | None = None
+    adjustment: Decimal | None = None
 
 
 # ─── Withdrawals ────────────────────────────────────────────
 
 
 class WithdrawalRequest(BaseModel):
-    amount: float = Field(..., gt=0)
+    amount: Decimal = Field(..., gt=Decimal("0"))
     currency: str = "INR"
 
 
 class WithdrawalResponse(BaseModel):
     id: str
     user_id: str
-    amount: float
+    amount: Decimal
     currency: str
     status: str
     created_at: str | None = None
@@ -134,9 +133,9 @@ class WithdrawalAction(BaseModel):
 
 class BalanceResponse(BaseModel):
     user_id: str
-    available_balance: float
-    pending_balance: float
-    ledger_balance: float
+    available_balance: Decimal
+    pending_balance: Decimal
+    ledger_balance: Decimal
     currency: str
     is_synced: bool
 

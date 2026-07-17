@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Enum as SAEnum, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Numeric, String, Enum as SAEnum, Text
 from sqlalchemy.orm import relationship
 
 from app.core.enums import LedgerEntryType, Currency
@@ -42,7 +42,7 @@ class LedgerEntry(Base):
         String(36), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     entry_type = Column(SAEnum(LedgerEntryType), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default=Currency.INR.value, nullable=False)
     reference_type = Column(String(50), nullable=False)
     reference_id = Column(String(36), nullable=False)

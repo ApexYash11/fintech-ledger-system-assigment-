@@ -21,7 +21,7 @@ from app.services.withdrawal_service import WithdrawalService
 router = APIRouter(prefix="/withdrawals", tags=["withdrawals"])
 
 
-@router.post("", response_model=dict, status_code=201)
+@router.post("", status_code=201)
 def request_withdrawal(
     withdrawal_data: WithdrawalRequest,
     request: Request,
@@ -56,13 +56,13 @@ def request_withdrawal(
         uow.commit()
         return result
     except DomainError as e:
-        raise HTTPException(status_code=400, detail=e.message)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         uow.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{withdrawal_id}", response_model=dict)
+@router.get("/{withdrawal_id}")
 def get_withdrawal(
     withdrawal_id: str,
     uow: UnitOfWork = Depends(get_uow),
@@ -76,7 +76,7 @@ def get_withdrawal(
     return result
 
 
-@router.get("", response_model=dict)
+@router.get("")
 def list_withdrawals(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -103,7 +103,7 @@ def list_withdrawals(
     return {"items": items, "skip": skip, "limit": limit, "total": len(items)}
 
 
-@router.post("/{withdrawal_id}/cancel", response_model=dict)
+@router.post("/{withdrawal_id}/cancel")
 def cancel_withdrawal(
     withdrawal_id: str,
     request: Request,
@@ -128,7 +128,7 @@ def cancel_withdrawal(
         uow.commit()
         return result
     except DomainError as e:
-        raise HTTPException(status_code=400, detail=e.message)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         uow.rollback()
         raise HTTPException(status_code=500, detail=str(e))

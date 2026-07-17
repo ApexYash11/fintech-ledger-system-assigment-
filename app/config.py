@@ -4,6 +4,8 @@ All configuration is loaded from environment variables / .env file.
 No hardcoded configuration values in application code.
 """
 
+from decimal import Decimal
+
 from pydantic_settings import BaseSettings
 
 
@@ -16,7 +18,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # Business rules
-    advance_payout_percentage: float = 0.10
+    advance_payout_percentage: Decimal = Decimal("0.10")
     min_withdrawal_amount: float = 100.00
     withdrawal_cooldown_hours: int = 24
 

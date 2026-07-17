@@ -35,11 +35,11 @@ def process_advance_payouts(db: Session) -> dict:
     from app.db.repositories.payout_repo import PayoutRepository
     from app.db.unit_of_work import UnitOfWork
     from app.services.payout_service import PayoutService
-    from app.infra.payment.mock import MockPaymentGateway
+    from app.infra.payment import create_gateway
     from app.core.enums import PayoutType
 
     payout_service = PayoutService()
-    gateway = MockPaymentGateway()
+    gateway = create_gateway()
 
     sale_repo = SaleRepository(db)
     uow = UnitOfWork(db)
@@ -141,10 +141,10 @@ def recover_stuck_withdrawals(db: Session) -> dict:
     from app.db.repositories.withdrawal_repo import WithdrawalRepository
     from app.db.unit_of_work import UnitOfWork
     from app.services.withdrawal_service import WithdrawalService
-    from app.infra.payment.mock import MockPaymentGateway
+    from app.infra.payment import create_gateway
 
     withdrawal_service = WithdrawalService()
-    gateway = MockPaymentGateway()
+    gateway = create_gateway()
 
     withdrawal_repo = WithdrawalRepository(db)
     uow = UnitOfWork(db)
@@ -218,11 +218,10 @@ def process_settlements(db: Session) -> dict:
     from app.db.repositories.payout_repo import PayoutRepository
     from app.db.unit_of_work import UnitOfWork
     from app.services.payout_service import PayoutService
-    from app.infra.payment.mock import MockPaymentGateway
-    from app.core.enums import PayoutType
+    from app.infra.payment import create_gateway
 
     payout_service = PayoutService()
-    gateway = MockPaymentGateway()
+    gateway = create_gateway()
     payout_repo = PayoutRepository(db)
 
     processed = 0

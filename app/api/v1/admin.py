@@ -56,13 +56,13 @@ def reconcile_sale(
         uow.commit()
         return result
     except DomainError as e:
-        raise HTTPException(status_code=400, detail=e.message)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         uow.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/pending-sales", response_model=dict)
+@router.get("/pending-sales")
 def list_pending_sales(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -75,7 +75,7 @@ def list_pending_sales(
     return {"items": items, "skip": skip, "limit": limit, "total": len(items)}
 
 
-@router.get("/withdrawals", response_model=dict)
+@router.get("/withdrawals")
 def list_withdrawals(
     status: str | None = Query(None),
     skip: int = Query(0, ge=0),
@@ -103,7 +103,7 @@ def list_withdrawals(
     return {"items": items, "skip": skip, "limit": limit, "total": len(items)}
 
 
-@router.post("/withdrawals/{withdrawal_id}/action", response_model=dict)
+@router.post("/withdrawals/{withdrawal_id}/action")
 def process_withdrawal_action(
     withdrawal_id: str,
     action: WithdrawalAction,
@@ -159,7 +159,7 @@ def process_withdrawal_action(
         uow.commit()
         return result
     except DomainError as e:
-        raise HTTPException(status_code=400, detail=e.message)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         uow.rollback()
         raise HTTPException(status_code=500, detail=str(e))

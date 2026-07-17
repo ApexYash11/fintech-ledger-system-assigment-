@@ -45,15 +45,14 @@ class BaseRepository(Generic[ModelType]):
         """Get entity with SELECT FOR UPDATE (row-level lock).
 
         Used within transactions to prevent concurrent modifications.
-        Falls back to plain SELECT for SQLite (no row locking).
+        SQLAlchemy handles dialect-specific rendering (uses FOR UPDATE
+        on PostgreSQL, silently ignored on SQLite which uses BEGIN IMMEDIATE).
         """
-        stmt = select(self.model_class).where(
-            self.model_class.id == entity_id  # type: ignore[attr-defined]
+        stmt = (
+            select(self.model_class)
+            .where(self.model_class.id == entity_id)  # type: ignore[attr-defined]
+            .with_for_update()
         )
-        # SQLAlchemy with PostgreSQL supports .with_for_update()
-        # We check the dialect at runtime
-        if self.db.bind and self.db.bind.dialect.name == "postgresql":
-            stmt = stmt.with_for_update()
         result = self.db.execute(stmt)
         return result.scalar_one_or_none()
 

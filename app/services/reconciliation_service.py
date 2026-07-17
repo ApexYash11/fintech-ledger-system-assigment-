@@ -20,6 +20,7 @@ Mitigation: Reconciliation is an admin operation, not user-facing.
 Admin operations have much lower concurrency requirements.
 """
 
+from decimal import Decimal
 from typing import Any
 
 from app.core.enums import SaleStatus, PayoutType, LedgerEntryType
@@ -76,11 +77,15 @@ class ReconciliationService:
         old_status = sale.status.value
 
         # 4. Update sale
-        sale.status = target_status
-        sale.reconciled_by = admin_id
-        sale.reconciled_at = datetime.now(timezone.utc)
-        sale.notes = notes
-        sale.version += 1
+        uow.sales.update(
+            sale,
+            {
+                "status": target_status,
+                "reconciled_by": admin_id,
+                "reconciled_at": datetime.now(timezone.utc),
+                "notes": notes,
+            },
+        )
 
         # 5. Handle financial implications
         result = {
@@ -128,7 +133,7 @@ class ReconciliationService:
         # Check if advance payout was made
         advance_payout = uow.payouts.get_by_sale_and_type(sale.id, PayoutType.ADVANCE)
 
-        advance_amount = advance_payout.amount if advance_payout else 0.0
+        advance_amount = advance_payout.amount if advance_payout else Decimal("0")
         remaining = sale.earnings - advance_amount
 
         if remaining > 0:
@@ -160,6 +165,12 @@ class ReconciliationService:
                 reference_id=payout_id,
                 description=f"Final settlement for sale {sale.id} (earnings: {sale.earnings}, advance: {advance_amount})",
                 idempotency_key=f"{idempotency_key}_ledger" if idempotency_key else None,
+            )
+
+            # Update cached balance so the user can see it immediately
+            uow.balances.update_balance(
+                sale.user_id,
+                available_delta=remaining,
             )
 
             return {

@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, String, Enum as SAEnum, Text
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Enum as SAEnum,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.enums import SaleStatus, Currency
@@ -42,7 +52,7 @@ class Sale(Base, TimestampMixin, VersionMixin):
         String(36), ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     external_id = Column(String(255), unique=True, nullable=False)
-    earnings = Column(Float, nullable=False)
+    earnings = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default=Currency.INR.value, nullable=False)
     status = Column(SAEnum(SaleStatus), default=SaleStatus.PENDING, nullable=False, index=True)
     reconciled_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

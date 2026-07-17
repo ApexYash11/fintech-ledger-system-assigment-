@@ -1,7 +1,8 @@
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.enums import SaleStatus
@@ -43,18 +44,24 @@ class SaleRepository(BaseRepository[Sale]):
         """Get a batch of pending sales that haven't had advance payouts yet.
 
         Uses offset-based pagination. Excludes sales that already have an ADVANCE payout.
+        Uses LEFT JOIN anti-join pattern for better performance than NOT IN.
         """
         from app.db.models.payout import Payout
         from app.core.enums import PayoutType
 
-        subq = select(Payout.sale_id).where(Payout.type == PayoutType.ADVANCE).subquery()
-
         stmt = (
             select(Sale)
+            .outerjoin(
+                Payout,
+                and_(
+                    Payout.sale_id == Sale.id,
+                    Payout.type == PayoutType.ADVANCE,
+                ),
+            )
             .where(
                 and_(
                     Sale.status == SaleStatus.PENDING,
-                    Sale.id.notin_(select(subq.c.sale_id)),
+                    Payout.id.is_(None),
                 )
             )
             .options(joinedload(Sale.user), joinedload(Sale.brand))
@@ -87,12 +94,20 @@ class SaleRepository(BaseRepository[Sale]):
         from app.db.models.payout import Payout
         from app.core.enums import PayoutType
 
-        subq = select(Payout.sale_id).where(Payout.type == PayoutType.ADVANCE).subquery()
-
-        stmt = select(Sale).where(
-            and_(
-                Sale.status == SaleStatus.PENDING,
-                Sale.id.notin_(select(subq.c.sale_id)),
+        stmt = (
+            select(func.count(Sale.id))
+            .outerjoin(
+                Payout,
+                and_(
+                    Payout.sale_id == Sale.id,
+                    Payout.type == PayoutType.ADVANCE,
+                ),
+            )
+            .where(
+                and_(
+                    Sale.status == SaleStatus.PENDING,
+                    Payout.id.is_(None),
+                )
             )
         )
-        return len(self.db.execute(stmt).scalars().all())
+        return self.db.execute(stmt).scalar() or 0

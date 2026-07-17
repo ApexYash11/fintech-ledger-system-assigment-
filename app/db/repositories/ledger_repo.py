@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select, func, and_
@@ -25,7 +26,7 @@ class LedgerRepository(BaseRepository[LedgerEntry]):
         stmt = select(LedgerEntry).where(LedgerEntry.idempotency_key == key)
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def get_user_balance(self, user_id: Any) -> float:
+    def get_user_balance(self, user_id: Any) -> Decimal:
         """Calculate actual user balance by summing all ledger entries.
 
         This is the SOURCE OF TRUTH balance calculation.
@@ -33,7 +34,7 @@ class LedgerRepository(BaseRepository[LedgerEntry]):
         """
         stmt = select(func.sum(LedgerEntry.amount)).where(LedgerEntry.user_id == user_id)
         result = self.db.execute(stmt).scalar()
-        return float(result) if result is not None else 0.0
+        return Decimal(str(result)) if result is not None else Decimal("0")
 
     def get_user_entries(
         self,

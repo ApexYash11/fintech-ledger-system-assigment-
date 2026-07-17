@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, String, Enum as SAEnum, Text, Index
+from sqlalchemy import Column, DateTime, ForeignKey, Numeric, String, Enum as SAEnum, Text, Index
 from sqlalchemy.orm import relationship
 
 from app.core.enums import WithdrawalStatus, Currency
@@ -14,14 +14,14 @@ class Withdrawal(Base, TimestampMixin, VersionMixin):
     user_id = Column(
         String(36), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String(3), default=Currency.INR.value, nullable=False)
     status = Column(
         SAEnum(WithdrawalStatus), default=WithdrawalStatus.PENDING, nullable=False, index=True
     )
     idempotency_key = Column(String(255), unique=True, nullable=False)
     gateway_reference = Column(String(255), nullable=True)
-    gateway_response = Column(String(1024), nullable=True)
+    gateway_response = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

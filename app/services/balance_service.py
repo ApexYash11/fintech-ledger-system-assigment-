@@ -44,7 +44,7 @@ class BalanceService:
             "pending_balance": cached_balance.pending_balance,
             "ledger_balance": ledger_balance,
             "currency": cached_balance.currency,
-            "is_synced": abs(cached_balance.available_balance - ledger_balance) < 0.01,
+            "is_synced": abs(cached_balance.available_balance - ledger_balance) < Decimal("0.01"),
         }
 
     def recalculate_balance(self, uow: UnitOfWork, user_id: Any) -> None:

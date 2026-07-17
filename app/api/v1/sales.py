@@ -24,7 +24,7 @@ from app.services.sale_service import SaleService
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
-@router.post("", response_model=dict, status_code=201)
+@router.post("", status_code=201)
 def create_sale(
     sale_data: SaleCreate,
     request: Request,
@@ -44,7 +44,7 @@ def create_sale(
         with uow:
             result = service.create_sale(
                 uow=uow,
-                user_id=sale_data.user_id,
+                user_id=str(current_user.id),
                 brand_id=sale_data.brand_id,
                 external_id=sale_data.external_id,
                 earnings=sale_data.earnings,
@@ -55,7 +55,7 @@ def create_sale(
         uow.commit()
         return result
     except DomainError as e:
-        raise HTTPException(status_code=400, detail=e.message)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         uow.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -75,7 +75,7 @@ def get_sale(
     return result
 
 
-@router.get("", response_model=dict)
+@router.get("")
 def list_sales(
     status: str | None = Query(None),
     skip: int = Query(0, ge=0),

@@ -90,7 +90,6 @@ class TestSaleAPI:
         sale_resp = client.post(
             "/api/v1/sales",
             json={
-                "user_id": user_id,
                 "brand_id": brand_id,
                 "external_id": ext_id,
                 "earnings": 500.00,
@@ -108,7 +107,6 @@ class TestSaleAPI:
         response = client.post(
             "/api/v1/sales",
             json={
-                "user_id": str(uuid.uuid4()),
                 "brand_id": str(uuid.uuid4()),
                 "external_id": f"EXT_{uuid.uuid4().hex}",
                 "earnings": 500.00,

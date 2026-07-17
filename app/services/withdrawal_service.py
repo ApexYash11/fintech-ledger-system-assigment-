@@ -181,8 +181,7 @@ class WithdrawalService:
 
         WithdrawalStateMachine.validate_transition(withdrawal.status, WithdrawalStatus.PROCESSING)
 
-        withdrawal.status = WithdrawalStatus.PROCESSING
-        withdrawal.version += 1
+        uow.withdrawals.update(withdrawal, {"status": WithdrawalStatus.PROCESSING})
 
         uow.audit.log(
             entity_type="Withdrawal",
@@ -216,10 +215,14 @@ class WithdrawalService:
 
         WithdrawalStateMachine.validate_transition(withdrawal.status, WithdrawalStatus.COMPLETED)
 
-        withdrawal.status = WithdrawalStatus.COMPLETED
-        withdrawal.gateway_reference = gateway_reference
-        withdrawal.completed_at = datetime.now(timezone.utc)
-        withdrawal.version += 1
+        uow.withdrawals.update(
+            withdrawal,
+            {
+                "status": WithdrawalStatus.COMPLETED,
+                "gateway_reference": gateway_reference,
+                "completed_at": datetime.now(timezone.utc),
+            },
+        )
 
         uow.audit.log(
             entity_type="Withdrawal",
@@ -265,10 +268,14 @@ class WithdrawalService:
 
         WithdrawalStateMachine.validate_transition(withdrawal.status, WithdrawalStatus.FAILED)
 
-        withdrawal.status = WithdrawalStatus.FAILED
-        withdrawal.error_message = error_message
-        withdrawal.gateway_response = gateway_response
-        withdrawal.version += 1
+        uow.withdrawals.update(
+            withdrawal,
+            {
+                "status": WithdrawalStatus.FAILED,
+                "error_message": error_message,
+                "gateway_response": gateway_response,
+            },
+        )
 
         # Compensating transaction: credit the money back
         uow.ledger.create_entry(
@@ -323,9 +330,13 @@ class WithdrawalService:
 
         WithdrawalStateMachine.validate_transition(withdrawal.status, WithdrawalStatus.REJECTED)
 
-        withdrawal.status = WithdrawalStatus.REJECTED
-        withdrawal.error_message = reason
-        withdrawal.version += 1
+        uow.withdrawals.update(
+            withdrawal,
+            {
+                "status": WithdrawalStatus.REJECTED,
+                "error_message": reason,
+            },
+        )
 
         # Compensating transaction
         uow.ledger.create_entry(
@@ -388,8 +399,7 @@ class WithdrawalService:
 
         WithdrawalStateMachine.validate_transition(withdrawal.status, WithdrawalStatus.CANCELLED)
 
-        withdrawal.status = WithdrawalStatus.CANCELLED
-        withdrawal.version += 1
+        uow.withdrawals.update(withdrawal, {"status": WithdrawalStatus.CANCELLED})
 
         # Compensating transaction
         uow.ledger.create_entry(
@@ -450,6 +460,3 @@ class WithdrawalService:
             if withdrawal.completed_at
             else None,
         }
-
-
-from datetime import timedelta

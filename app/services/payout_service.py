@@ -126,9 +126,13 @@ class PayoutService:
 
         PayoutStateMachine.validate_transition(payout.status, PayoutStatus.COMPLETED)
 
-        payout.status = PayoutStatus.COMPLETED
-        payout.gateway_reference = gateway_reference
-        payout.version += 1
+        uow.payouts.update(
+            payout,
+            {
+                "status": PayoutStatus.COMPLETED,
+                "gateway_reference": gateway_reference,
+            },
+        )
 
         uow.audit.log(
             entity_type="Payout",
@@ -164,9 +168,13 @@ class PayoutService:
 
         PayoutStateMachine.validate_transition(payout.status, PayoutStatus.FAILED)
 
-        payout.status = PayoutStatus.FAILED
-        payout.gateway_response = error_message
-        payout.version += 1
+        uow.payouts.update(
+            payout,
+            {
+                "status": PayoutStatus.FAILED,
+                "gateway_response": error_message,
+            },
+        )
 
         uow.audit.log(
             entity_type="Payout",

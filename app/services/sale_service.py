@@ -12,6 +12,7 @@ Design decisions:
    - Background processing allows retry with backoff
 """
 
+from decimal import Decimal
 from typing import Any
 
 from app.core.enums import SaleStatus, UserStatus, BrandStatus
@@ -36,7 +37,7 @@ class SaleService:
         user_id: str,
         brand_id: str,
         external_id: str,
-        earnings: float,
+        earnings: Decimal,
         currency: str = "INR",
         idempotency_key: str | None = None,
         ip_address: str | None = None,

@@ -51,6 +51,8 @@ def setup_scheduler() -> BackgroundScheduler:
         name="Process pending advance payouts",
         replace_existing=True,
         misfire_grace_time=30,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Recovery job — every 5 minutes
@@ -62,6 +64,8 @@ def setup_scheduler() -> BackgroundScheduler:
         name="Recover stuck processing withdrawals",
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Settlement job — every hour
@@ -73,6 +77,8 @@ def setup_scheduler() -> BackgroundScheduler:
         name="Process pending settlements",
         replace_existing=True,
         misfire_grace_time=120,
+        max_instances=1,
+        coalesce=True,
     )
 
     scheduler.start()

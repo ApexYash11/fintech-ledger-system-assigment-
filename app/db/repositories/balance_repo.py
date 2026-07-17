@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import case, select, update
+from sqlalchemy import case, select, text, update
 from sqlalchemy.orm import Session
 
 from app.db.models.user_balance import UserBalance
@@ -20,9 +20,7 @@ class BalanceRepository(BaseRepository[UserBalance]):
 
     def get_by_user_for_update(self, user_id: Any) -> UserBalance | None:
         """Get balance row with SELECT FOR UPDATE (within transaction)."""
-        stmt = select(UserBalance).where(UserBalance.user_id == user_id)
-        if self.db.bind and self.db.bind.dialect.name == "postgresql":
-            stmt = stmt.with_for_update()
+        stmt = select(UserBalance).where(UserBalance.user_id == user_id).with_for_update()
         return self.db.execute(stmt).scalar_one_or_none()
 
     def get_or_create(self, user_id: Any) -> UserBalance:
@@ -50,37 +48,66 @@ class BalanceRepository(BaseRepository[UserBalance]):
     ) -> UserBalance:
         """Atomically update a user's cached balance.
 
-        Uses an UPDATE statement for atomicity rather than
-        read-modify-write, avoiding race conditions.
+        Uses an UPSERT (INSERT ON CONFLICT DO UPDATE) for atomicity.
         Clamps to zero to prevent negative balances (safety net).
-
-        Falls back to create-if-not-exists when no row exists.
         """
         import uuid
+        from datetime import datetime, timezone
 
-        new_available = UserBalance.available_balance + available_delta
-        new_pending = UserBalance.pending_balance + pending_delta
+        dialect = self.db.bind.dialect.name if self.db.bind else "sqlite"
 
-        stmt = (
-            update(UserBalance)
-            .where(UserBalance.user_id == user_id)
-            .values(
-                available_balance=case((new_available < 0, 0.0), else_=new_available),
-                pending_balance=case((new_pending < 0, 0.0), else_=new_pending),
+        if dialect == "postgresql":
+            stmt = text("""
+                INSERT INTO user_balances (id, user_id, available_balance, pending_balance, currency, created_at, updated_at, version)
+                VALUES (:id, :user_id, GREATEST(0.0, :available_delta), GREATEST(0.0, :pending_delta), 'INR', NOW(), NOW(), 1)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    available_balance = GREATEST(0.0, user_balances.available_balance + :available_delta2),
+                    pending_balance = GREATEST(0.0, user_balances.pending_balance + :pending_delta2),
+                    updated_at = NOW(),
+                    version = user_balances.version + 1
+                RETURNING *
+            """)
+            result = self.db.execute(
+                stmt,
+                {
+                    "id": str(uuid.uuid4()),
+                    "user_id": user_id,
+                    "available_delta": available_delta,
+                    "pending_delta": pending_delta,
+                    "available_delta2": available_delta,
+                    "pending_delta2": pending_delta,
+                },
             )
-        )
-        result = self.db.execute(stmt)
-
-        if result.rowcount == 0:
-            balance = UserBalance(
-                id=str(uuid.uuid4()),
-                user_id=user_id,
-                available_balance=max(0.0, available_delta),
-                pending_balance=max(0.0, pending_delta),
-            )
-            self.db.add(balance)
+            row = result.fetchone()
             self.db.flush()
-            return balance
+            return self.get_by_user(user_id)
+        else:
+            stmt = (
+                update(UserBalance)
+                .where(UserBalance.user_id == user_id)
+                .values(
+                    available_balance=case(
+                        (UserBalance.available_balance + available_delta < 0, 0.0),
+                        else_=UserBalance.available_balance + available_delta,
+                    ),
+                    pending_balance=case(
+                        (UserBalance.pending_balance + pending_delta < 0, 0.0),
+                        else_=UserBalance.pending_balance + pending_delta,
+                    ),
+                )
+            )
+            result = self.db.execute(stmt)
 
-        self.db.flush()
-        return self.get_by_user(user_id)
+            if result.rowcount == 0:
+                balance = UserBalance(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    available_balance=max(0.0, available_delta),
+                    pending_balance=max(0.0, pending_delta),
+                )
+                self.db.add(balance)
+                self.db.flush()
+                return balance
+
+            self.db.flush()
+            return self.get_by_user(user_id)

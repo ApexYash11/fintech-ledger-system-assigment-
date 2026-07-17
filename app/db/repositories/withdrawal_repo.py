@@ -47,11 +47,26 @@ class WithdrawalRepository(BaseRepository[Withdrawal]):
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def get_processing_withdrawals_batch(self, batch_size: int = 100) -> Sequence[Withdrawal]:
-        """Get withdrawals stuck in PROCESSING for recovery job."""
+    def get_processing_withdrawals_batch(
+        self,
+        batch_size: int = 100,
+        min_age_minutes: int = 60,
+    ) -> Sequence[Withdrawal]:
+        """Get withdrawals stuck in PROCESSING for recovery job.
+
+        Only returns withdrawals that have been in PROCESSING for at least
+        min_age_minutes, to avoid recovering transactions that are still
+        being processed by the gateway.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=min_age_minutes)
         stmt = (
             select(Withdrawal)
-            .where(Withdrawal.status == WithdrawalStatus.PROCESSING)
+            .where(
+                and_(
+                    Withdrawal.status == WithdrawalStatus.PROCESSING,
+                    Withdrawal.updated_at < cutoff,
+                )
+            )
             .order_by(Withdrawal.updated_at)
             .limit(batch_size)
         )

@@ -7,11 +7,15 @@ Creates and configures the FastAPI application with:
 - Database table creation
 """
 
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from decimal import Decimal
 import os
+from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -49,11 +53,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         scheduler.shutdown(wait=False)
 
 
+class DecimalJsonResponse(JSONResponse):
+    """JSONResponse that handles Decimal serialization.
+
+    Uses FastAPI's jsonable_encoder to convert non-serializable types
+    (like Decimal) to JSON-compatible values before rendering.
+    """
+
+    def render(self, content: Any) -> bytes:
+        return json.dumps(
+            jsonable_encoder(content),
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
 app = FastAPI(
     title="User Payout Management System",
     description="Production-inspired fintech ledger system for managing affiliate payouts",
     version="0.1.0",
     lifespan=lifespan,
+    default_response_class=DecimalJsonResponse,
 )
 
 
@@ -73,10 +95,11 @@ async def idempotency_middleware(request: Request, call_next):
     """Idempotency middleware — handles Idempotency-Key header.
 
     For POST/PUT/PATCH/DELETE requests with an Idempotency-Key:
-    1. First request: Process normally, cache the response
+    1. First request: Atomically claim the key, process normally, cache response
     2. Duplicate request: Return cached response without processing
 
-    This provides exactly-once semantics for the API layer.
+    Atomic claiming via INSERT OR IGNORE prevents race conditions
+    where two concurrent requests with the same key both get processed.
 
     Uses the app's dependency overrides for DB session resolution,
     so tests can inject their own session via get_db override.
@@ -96,21 +119,27 @@ async def idempotency_middleware(request: Request, call_next):
     db = next(db_gen)
     try:
         repo = IdempotencyRepository(db)
-        cached = repo.get_by_key(idempotency_key)
-        if cached:
-            import json
+        claimed = repo.try_claim(idempotency_key)
+        if not claimed:
+            cached = repo.get_by_key(idempotency_key)
+            if cached and cached.response_status != 0:
+                import json
 
+                return JSONResponse(
+                    status_code=cached.response_status,
+                    content=json.loads(cached.response_body) if cached.response_body else {},
+                    headers={"X-Idempotency-Replay": "true"},
+                )
             return JSONResponse(
-                status_code=cached.response_status,
-                content=json.loads(cached.response_body) if cached.response_body else {},
-                headers={"X-Idempotency-Replay": "true"},
+                status_code=409,
+                content={"detail": "Request is already being processed", "code": "conflict"},
             )
+        db.commit()
     finally:
         db_gen.close()
 
     response = await call_next(request)
 
-    # Cache the response for future idempotent requests
     if response.status_code < 500:
         db_gen2 = db_resolver()
         db2 = next(db_gen2)
@@ -122,7 +151,6 @@ async def idempotency_middleware(request: Request, call_next):
             async for chunk in response.body_iterator:
                 body += chunk
 
-            # Re-create the response since we consumed the body
             response = JSONResponse(
                 status_code=response.status_code,
                 content=json.loads(body) if body else {},

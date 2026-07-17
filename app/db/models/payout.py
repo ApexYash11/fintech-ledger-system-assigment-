@@ -1,6 +1,15 @@
 import uuid
 
-from sqlalchemy import Column, Float, ForeignKey, String, Enum as SAEnum, Index, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    Enum as SAEnum,
+    Index,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.enums import PayoutStatus, PayoutType
@@ -15,12 +24,12 @@ class Payout(Base, TimestampMixin, VersionMixin):
     user_id = Column(
         String(36), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     type = Column(SAEnum(PayoutType), nullable=False)
     status = Column(SAEnum(PayoutStatus), default=PayoutStatus.PENDING, nullable=False, index=True)
     idempotency_key = Column(String(255), unique=True, nullable=False)
     gateway_reference = Column(String(255), nullable=True)
-    gateway_response = Column(String(1024), nullable=True)
+    gateway_response = Column(Text, nullable=True)
 
     sale = relationship("Sale", back_populates="payouts")
     user = relationship("User", back_populates="payouts")
